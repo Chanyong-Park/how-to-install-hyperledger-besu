@@ -1,4 +1,4 @@
-# building BESU in private network
+# Building BESU in private network
 ## 1. download
 ```
 # 1. download
