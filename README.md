@@ -1,4 +1,4 @@
-# create make-genesis.json
+# building BESU in private network
 ## 1. download
 ```
 # 1. download
