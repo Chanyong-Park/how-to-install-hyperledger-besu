@@ -29,6 +29,10 @@ $ vi make-genesis.json
   "genesis": {
     "config": {
       "chainId": 12345,
+      "berlinBlock": 0,
+      "londonBlock": 0,
+      "zeroBaseFee": true,
+      "baseFeePerGas": "0x0",
       "qbft": {
         "blockperiodseconds": 2,
         "epochlength": 30000,
@@ -36,12 +40,18 @@ $ vi make-genesis.json
       }
     },
     "gasLimit": "0x1fffffffffffff",
-    "difficulty": "0x1"
+    "difficulty": "0x1",
+    "nonce": "0x0",
+    "timestamp": "0x58e81039",
+    "gasLimit": "0x1fffffffffffff",
+    "difficulty": "0x1",
+    "mixHash": "0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365",
+    "coinbase": "0x0000000000000000000000000000000000000000",
   },
   "blockchain": {
     "nodes": {
       "generate": true,
-      "count": 2
+      "count": 1
     }
   }
 }
@@ -49,7 +59,7 @@ $ vi make-genesis.json
 ## 4. create base files for private network
 ```
 $ besu operator generate-blockchain-config \
-                --config-file=to-patch.json \
+                --config-file=make-genesis.json \
                 --to=network-files
 $ tree
 .
@@ -59,13 +69,18 @@ $ tree
 ├── network-files
 │   ├── genesis.json
 │   └── keys
-│       ├── 0xce8adef2a32e9eb57c00494b712195690d30dde9
-│       │   ├── key.priv
-│       │   └── key.pub
-│       └── 0xef5444fbaf1ceee0b9c246b987d0c13113a9b58e
-│           ├── key.priv
-│           └── key.pub
-└── to-patch.json
+│       └── 0x7934f8b79b86e22d9d43e5dcef71ccdb6fc1702f
+│           ├── key.priv
+│           └── key.pub
+└── make-genesis.json
+
+# make extraData just in case
+$ vi make-encode.json
+[
+  "0x7934f8b79b86e22d9d43e5dcef71ccdb6fc1702f"  # this is an address from the priv/pub key above  
+]
+$ besu rlp encode --type=QBFT_EXTRA_DATA --from=make-encode.json
+0xf83aa00000000000000000000000000000000000000000000000000000000000000000d594ce8adef2a32e9eb57c00494b712195690d30dde9c080c0
 ```
 
 ## 5. install besu with nerdctl
@@ -74,7 +89,7 @@ $ nerdctl run -d --name besu-validator-1 \
   -p 8545:8545 \
   -p 30303:30303 \
   -v $(pwd)/network-files/genesis.json:/opt/besu/genesis.json \
-  -v $(pwd)/network-files/keys/0xce8adef2a32e9eb57c00494b712195690d30dde9/key.priv:/opt/besu/key.priv \
+  -v $(pwd)/network-files/keys/0x7934f8b79b86e22d9d43e5dcef71ccdb6fc1702f/key.priv:/opt/besu/key.priv \
   -v $(pwd)/data/besu-validator-1:/opt/besu/data \
   hyperledger/besu:24.1.1 \
   --data-path=/opt/besu/data \
@@ -85,5 +100,33 @@ $ nerdctl run -d --name besu-validator-1 \
   --rpc-http-cors-origins="*" \
   --rpc-http-api=ETH,NET,WEB3,ADMIN,DEBUG,MINER,NET,PERM,TXPOOL,QBFT
 
-$ nerdctl ps -a
+$ nerdctl ps
+
+$ nerdctl logs <CONTAINER ID> -n 100
+```
+
+## 6. verify
+```
+$ tree ./data
+./data
+└── besu-validator-1
+    ├── DATABASE_METADATA.json
+    ├── besu.networks
+    ├── besu.ports
+    ├── caches
+    │   ├── CACHE_METADATA.json
+    │   └── logBloom-0.cache
+    ├── database
+    │   ├── 000004.log
+    │   ├── CURRENT
+    │   ├── IDENTITY
+    │   ├── LOCK
+    │   ├── LOG
+    │   ├── MANIFEST-000005
+    │   ├── OPTIONS-000055
+    │   └── OPTIONS-000057
+    └── uploads
+
+$ curl -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' http://localhost:8545
+{"jsonrpc":"2.0","id":1,"result":"0x10"}
 ```
